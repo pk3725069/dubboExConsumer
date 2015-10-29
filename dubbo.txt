@@ -1,0 +1,23 @@
+线程模型
+	Dispatcher 
+	all 所有消息都派发到线程池，包括请求，响应，连接事件，断开事件，心跳等。
+
+	ThreadPool
+	fixed 固定大小线程池，启动时建立线程，不关闭，一直持有。(缺省)
+	cached 缓存线程池，空闲一分钟自动删除，需要时重建。
+	limited 可伸缩线程池，但池中的线程数只会增长不会收缩。(为避免收缩时突然来了大流量引起的性能问题)。
+
+配置
+<dubbo:protocol name="dubbo" dispatcher="all" threadpool="fixed" threads="100" />
+
+
+直连提供者（Test Only）
+注意**********
+  为了避免复杂化线上环境，不要在线上使用这个功能，只应在测试阶段使用。
+在开发及测试环境下，经常需要绕过注册中心***，只测试指定服务提供者，这时候可能需要点对点直连****
+
+(1) 如果是线上需求需要点对点，可在<dubbo:reference>中配置url指向提供者
+将绕过注册中心，多个地址用分号隔开****
+
+<dubbo:reference id="xxxService" interface="com.alibaba.xxx.XxxService" url="dubbo://localhost:20890" />
+
