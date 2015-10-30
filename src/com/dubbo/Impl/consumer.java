@@ -11,10 +11,13 @@ public class consumer {
 				new String[] { "consumer.xml" });
 		context.start();
 
-		HelloService helloService = (HelloService) context.getBean("helloService");
+		HelloService helloService = (HelloService) context.getBean("feedbackIndexService");
 		String hello = helloService.sayHello("tom");
 		System.out.println(hello);
-
+		
+		 helloService = (HelloService) context.getBean("memberIndexService");
+		 hello = helloService.sayHello("tom");
+		System.out.println(hello);
 		System.in.read();
 	}
 
