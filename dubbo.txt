@@ -1,23 +1,131 @@
-�߳�ģ��
+线程模型
 	Dispatcher 
-	all ������Ϣ���ɷ����̳߳أ�����������Ӧ�������¼����Ͽ��¼��������ȡ�
+	all 所有消息都派发到线程池，包括请求，响应，连接事件，断开事件，心跳等。
 
 	ThreadPool
-	fixed �̶���С�̳߳أ�����ʱ�����̣߳����رգ�һֱ���С�(ȱʡ)
-	cached �����̳߳أ�����һ�����Զ�ɾ������Ҫʱ�ؽ���
-	limited �������̳߳أ������е��߳���ֻ����������������(Ϊ��������ʱͻȻ���˴������������������)��
+	fixed 固定大小线程池，启动时建立线程，不关闭，一直持有。(缺省)
+	cached 缓存线程池，空闲一分钟自动删除，需要时重建。
+	limited 可伸缩线程池，但池中的线程数只会增长不会收缩。(为避免收缩时突然来了大流量引起的性能问题)。
 
-����
+配置
 <dubbo:protocol name="dubbo" dispatcher="all" threadpool="fixed" threads="100" />
 
 
-ֱ���ṩ�ߣ�Test Only��
-ע��**********
-  Ϊ�˱��⸴�ӻ����ϻ�������Ҫ������ʹ��������ܣ�ֻӦ�ڲ��Խ׶�ʹ�á�
-�ڿ��������Ի����£�������Ҫ�ƹ�ע������***��ֻ����ָ�������ṩ�ߣ���ʱ�������Ҫ��Ե�ֱ��****
+直连提供者（Test Only）
+注意**********
+  为了避免复杂化线上环境，不要在线上使用这个功能，只应在测试阶段使用。
+在开发及测试环境下，经常需要绕过注册中心***，只测试指定服务提供者，这时候可能需要点对点直连****
 
-(1) ���������������Ҫ��Ե㣬����<dubbo:reference>������urlָ���ṩ��
-���ƹ�ע�����ģ������ַ�÷ֺŸ���****
+(1) 如果是线上需求需要点对点，可在<dubbo:reference>中配置url指向提供者
+将绕过注册中心，多个地址用分号隔开****
 
 <dubbo:reference id="xxxService" interface="com.alibaba.xxx.XxxService" url="dubbo://localhost:20890" />
 
+静态服务
+ 有时候希望人工管理服务提供者****的上线和下线，此时需将注册中心标识为非动态管理模式
+ <dubbo:registry address="10.20.141.150:9090" dynamic="false" />
+ ？？？？？？？？？？？？？？？？？？？？？？？？？？？？？
+如果是一个第三方独立提供者，比如memcached等，可以直接向注册中心写入提供者地址信息，消费者正常使用：
+(通常由脚本监控中心页面等调用)
+RegistryFactory registryFactory = ExtensionLoader.getExtensionLoader(RegistryFactory.class).getAdaptiveExtension();
+Registry registry = registryFactory.getRegistry(URL.valueOf("zookeeper://10.20.153.10:2181"));
+registry.register(URL.valueOf("memcached://10.20.153.11/com.foo.BarService?category=providers&dynamic=false&application=foo"));
+
+
+多协议
+(1) 不同服务不同协议
+不同服务在性能上适用不同协议进行传输。
+比如大数据用短连接协议，小数据大并发用长连接协议。
+ 	<!-- 多协议配置 -->
+    <dubbo:protocol name="dubbo" port="20880" />
+    <dubbo:protocol name="rmi" port="1099" />
+ 
+    <!-- 使用dubbo协议暴露服务 -->
+    <dubbo:service interface="com.alibaba.hello.api.HelloService" version="1.0.0" ref="helloService" protocol="dubbo" />
+    <!-- 使用rmi协议暴露服务 -->
+    <dubbo:service interface="com.alibaba.hello.api.DemoService" version="1.0.0" ref="demoService" protocol="rmi" />
+    
+(2) 多协议暴露服务   	
+需要与http客户端互操作
+    <!-- 多协议配置 -->
+    <dubbo:protocol name="dubbo" port="20880" />
+    <dubbo:protocol name="hessian" port="8080" />
+ 
+    <!-- 使用多个协议暴露服务 -->
+    <dubbo:service id="helloService" interface="com.alibaba.hello.api.HelloService" version="1.0.0" protocol="dubbo,hessian" />
+    
+    
+
+多注册中心
+(1) 多注册中心注册
+中文站有些服务来不及在青岛部署，只在杭州部署，而青岛的其它应用需要引用此服务；
+就可以将服务同时注册到两个注册中心？？？？
+    <!-- 多注册中心配置 -->
+    <dubbo:registry id="hangzhouRegistry" address="10.20.141.150:9090" />
+    <dubbo:registry id="qingdaoRegistry" address="10.20.141.151:9010" default="false" />
+
+	<!-- 向多个注册中心注册 -->
+    <dubbo:service interface="com.alibaba.hello.api.HelloService" version="1.0.0" ref="helloService" registry="hangzhouRegistry,qingdaoRegistry" />
+
+
+(2) 不同服务使用不同注册中心
+CRM有些服务是专门为国际站设计的，有些服务是专门为中文站设计的
+	<!-- 多注册中心配置 -->
+    <dubbo:registry id="chinaRegistry" address="10.20.141.150:9090" />
+    <dubbo:registry id="intlRegistry" address="10.20.154.177:9010" default="false" />
+    
+	<!-- 向中文站注册中心注册 -->
+    <dubbo:service interface="com.alibaba.hello.api.HelloService" version="1.0.0" ref="helloService" registry="chinaRegistry" />
+ 
+    <!-- 向国际站注册中心注册 -->
+    <dubbo:service interface="com.alibaba.hello.api.DemoService" version="1.0.0" ref="demoService" registry="intlRegistry" />
+
+(3) 多注册中心引用
+CRM需同时调用中文站和国际站的PC2服务，PC2在中文站和国际站均有部署，
+接口及版本号都一样，但连的数据库不一样？？？？？？？？？？？？？？
+	<!-- 多注册中心配置 -->
+    <dubbo:registry id="chinaRegistry" address="10.20.141.150:9090" />
+    <dubbo:registry id="intlRegistry" address="10.20.154.177:9010" default="false" />
+ 
+    <!-- 引用中文站服务 -->
+    <dubbo:reference id="chinaHelloService" interface="com.alibaba.hello.api.HelloService" version="1.0.0" registry="chinaRegistry" />
+ 
+    <!-- 引用国际站站服务 -->
+    <dubbo:reference id="intlHelloService" interface="com.alibaba.hello.api.HelloService" version="1.0.0" registry="intlRegistry" />
+    
+服务分组
+当一个接口有多种实现时，可以用group区分???????????????????
+provider.xml
+	<dubbo:service group="feedback" interface="com.xxx.IndexService" />
+	<dubbo:service group="member" interface="com.xxx.IndexService" />
+
+consumer.xml
+	<dubbo:reference id="feedbackIndexService" group="feedback" interface="com.xxx.IndexService" />
+	<dubbo:reference id="memberIndexService" group="member" interface="com.xxx.IndexService" />    
+任意组
+    <dubbo:reference id="barService" interface="com.foo.BarService" group="*" />
+
+多版本
+当一个接口实现，出现不兼容升级时，可以用版本号过渡。
+版本号不同的服务相互间不引用。
+
+	版本升级流程：
+	在低压力时间段，先升级一半提供者为新版本
+	再将所有消费者升级为新版本
+	然后将剩下的一半提供者升级为新版本
+	        
+	<dubbo:service interface="com.foo.BarService" version="1.0.0" />
+	<dubbo:service interface="com.foo.BarService" version="2.0.0" />
+	
+	
+	<dubbo:reference id="barService" interface="com.foo.BarService" version="1.0.0" />
+	<dubbo:reference id="barService" interface="com.foo.BarService" version="2.0.0" />
+
+
+分组聚合
+按组合并返回结果，比如菜单服务，接口一样，但有多种实现，用group区分，
+现在消费方需从每种group中调用一次返回结果，合并结果****返回，这样就可以实现聚合菜单项。
+	<dubbo:reference interface="com.xxx.MenuService" group="*" merger="true" />
+
+	
+	<dubbo:reference interface="com.xxx.MenuService" group="aaa,bbb" merger="true" />
