@@ -129,3 +129,95 @@ consumer.xml
 
 	
 	<dubbo:reference interface="com.xxx.MenuService" group="aaa,bbb" merger="true" />
+	
+	传入的参数验证
+参数验证功能是基于JSR303实现的，用户只需标识JSR303标准的验证Annotation，并通过声明filter来实现验证。
+加入标签验证@NotNull
+		@Size(min = 2, max = 20)
+		...
+<dubbo:reference  xxx  validation="true" />
+<dubbo:service  xxx  validation="true" />
+
+
+编译的问题
+Failed to invoke the method save in the service com.dubbo.ValidationService. 
+Tried 3 times of the providers [192.168.37.1:20880] (1/1) from the registry 127.0.0.1:2181 on the consumer 192.168.37.1 using the dubbo version 2.5.3.
+Last error is: Unable to find a default provider
+ 需要增加hibernante-validator.jar包
+
+原文中提到**************************** 
+ 需要加入依赖：
+<dependency>
+    <groupId>javax.validation</groupId>
+    <artifactId>validation-api</artifactId>
+    <version>1.0.0.GA</version>
+</dependency>
+<dependency>
+    <groupId>org.hibernate</groupId>
+    <artifactId>hibernate-validator</artifactId>
+    <version>4.2.0.Final</version>
+</dependency>
+
+结果缓存
+结果缓存，用于加速热门数据的访问速度，Dubbo提供声明式缓存，以减少用户加缓存的工作量。
+
+	lru 基于最近最少使用原则删除多余缓存，保持最热的数据被缓存。
+	threadlocal 当前线程缓存，比如一个页面渲染，用到很多portal，每个portal都要去查用户信息，通过线程缓存，可以减少这种多余访问。
+	jcache 与JSR107集成，可以桥接各种缓存实现。
+	
+配置：
+<dubbo:reference interface="com.foo.BarService" cache="lru" />
+
+method:
+<dubbo:reference interface="com.foo.BarService">
+    <dubbo:method name="findBar" cache="lru" />
+</dubbo:reference>
+
+泛化引用
+泛接口调用方式主要用于客户端没有API接口及模型类元的情况，参数及返回值中的所有POJO均用Map表示，通常用于框架集成，
+比如：实现一个通用的服务测试框架，可通过GenericService调用所有服务实现
+
+<dubbo:reference id="barService" interface="com.foo.BarService" generic="true" />
+只在consumer.xml配置了
+
+Failed to invoke the method $invoke in the service com.alibaba.dubbo.rpc.service.GenericService. 
+No provider available for the service com.dubbo.BarService from registry 127.0.0.1:2181 on the consumer 192.168.37.1 using the dubbo version 2.5.3.
+Please check if the providers have been started and registered.
+
+泛化实现
+   ...
+  
+回声测试   ping
+回声测试用于检测服务是否可用，回声测试按照正常请求流程执行，
+能够测试整个调用是否通畅，可用于监控。
+
+	consume.java
+	XXXService xxxService = ctx.getBean("xxxService"); // 远程服务引用,任意类型
+	EchoService echoService = (EchoService) xxxService; // 强制转型为EchoService
+	String status = echoService.$echo("OK"); // 回声测试可用性
+	*****************************************
+	所有服务自动实现EchoService接口，只需将任意服务引用强制转型为EchoService，即可使用。
+
+上下文信息
+上下文中存放的是当前调用过程中所需的环境信息。
+		consumer.java
+		RpcContext为内置变量
+		String serverIP = RpcContext.getContext().getRemoteHost(); // 获取最后一次调用的提供方IP地址
+		String application = RpcContext.getContext().getUrl().getParameter("application"); // 获取当前服务配置信息，所有配置信息都将转换为URL的参数
+
+
+隐式传参
+后面的远程调用都会隐式将这些参数发送到服务器端，类似cookie
+用于框架集成，不建议常规业务使用？？？
+	consumer.java
+	RpcContext.getContext().setAttachment("index", "1"); // 隐式传参
+	xxxService.xxx(); // 远程调用
+	注：
+		setAttachment设置的KV，在完成下面一次远程调用会被清空****。
+		
+	provider.java
+	public class XxxServiceImpl implements XxxService {
+	 	public void xxx() { // 服务方法实现
+	   		String index = RpcContext.getContext().getAttachment("index"); // 获取客户端隐式传入的参数，用于框架集成，不建议常规业务使用
+	     }
+	}
