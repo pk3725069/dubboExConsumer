@@ -129,3 +129,34 @@ consumer.xml
 
 	
 	<dubbo:reference interface="com.xxx.MenuService" group="aaa,bbb" merger="true" />
+	
+传入的参数验证
+参数验证功能是基于JSR303实现的，用户只需标识JSR303标准的验证Annotation，并通过声明filter来实现验证。
+加入标签验证@NotNull
+		@Size(min = 2, max = 20)
+		...
+<dubbo:reference  xxx  validation="true" />
+<dubbo:service  xxx  validation="true" />
+
+
+编译的问题
+Failed to invoke the method save in the service com.dubbo.ValidationService. 
+Tried 3 times of the providers [192.168.37.1:20880] (1/1) from the registry 127.0.0.1:2181 on the consumer 192.168.37.1 using the dubbo version 2.5.3.
+Last error is: Unable to find a default provider
+ 需要增加hibernante-validator.jar包
+
+原文中提到**************************** 
+ 需要加入依赖：
+<dependency>
+    <groupId>javax.validation</groupId>
+    <artifactId>validation-api</artifactId>
+    <version>1.0.0.GA</version>
+</dependency>
+<dependency>
+    <groupId>org.hibernate</groupId>
+    <artifactId>hibernate-validator</artifactId>
+    <version>4.2.0.Final</version>
+</dependency>
+
+结果缓存
+结果缓存，用于加速热门数据的访问速度，Dubbo提供声明式缓存，以减少用户加缓存的工作量。
