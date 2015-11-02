@@ -274,3 +274,97 @@ sent="false" 不等待消息发出，将消息放入IO队列，即刻返回。
 参数回调方式与调用本地callback或listener相同，只需要在Spring的配置文件中声明哪个参数是callback类型即可。
 Dubbo将基于长连接生成反向代理，这样就可以从服务器端调用客户端逻辑。
 
+配置：
+		<!-- 服务分组    id对应多种实现  -->
+		<dubbo:reference id="callbackService" interface="com.dubbo.CallbackService" />
+	
+			
+		<bean id="callbackService" class="com.callback.impl.CallbackServiceImpl" />
+		<dubbo:service interface="com.callback.CallbackService" ref="callbackService" connections="1" callbacks="1000">
+		    
+		    //配置方法 addListener
+		    <dubbo:method name="addListener">
+		    	
+		    	//配置 addListener对应的参数 CallbackListener类
+		        <dubbo:argument index="1" callback="true" />
+		        <!--也可以通过指定类型的方式-->
+		        <!--<dubbo:argument type="com.demo.CallbackListener" callback="true" />-->
+		    
+		    </dubbo:method>
+		    
+		</dubbo:service>
+
+
+自动回调：
+		provider.java
+ 		listener.changed(getChanged(key));
+ 		
+ 		consumer.java:
+ 		 callbackService.addListener("foo.bar", new CallbackListener() {
+            public void changed(String msg) {
+                System.out.println("callback1:" + msg);
+            }
+        });
+        
+        
+运行结果:
+		callback1:Changed: 2015-11-02 14:04:28
+		callback1:Changed: 2015-11-02 14:04:32
+		callback1:Changed: 2015-11-02 14:04:37
+		callback1:Changed: 2015-11-02 14:04:42
+		callback1:Changed: 2015-11-02 14:04:47
+--------------------------------------------------------------------------------
+事件通知
+	在调用之前，调用之后，出现异常时，会触发oninvoke, onreturn, onthrow三个事件。
+	可以配置当事件发生时，通知哪个类的哪个方法
+------------------------------------------------------
+
+本地存根
+
+
+
+本地伪装
+
+------------------------------------------------------
+延迟暴露
+如果你的服务需要启动时间，
+比如初始化缓存，等待相关资源就位等，可以使用delay进行延迟暴露。
+
+	延迟5秒暴露服务：
+		<dubbo:service delay="5000" />
+		
+	延迟到Spring初始化完成后，再暴露服务
+		(基于Spring的ContextRefreshedEvent事件触发暴露)
+		<dubbo:service delay="-1" />
+
+用于规避Spring2.x初始化死锁问题
+------------------------------------------------------
+并发控制
+	每个类中的每个方法并发执行
+	
+	Load Balance均衡：
+		配置服务的客户端的loadbalance属性为leastactive，
+		此Loadbalance会调用并发数最小的Provider（Consumer端并发数）		
+	<dubbo:reference interface="com.foo.BarService" loadbalance="leastactive" />
+------------------------------------------------------
+连接控制
+	限制连接连接数
+------------------------------------------------------	
+延迟连接	
+	延迟连接，用于减少长连接数，当有调用发起时，再创建长连接
+	
+------------------------------------------------------
+粘滞连接
+粘滞连接用于有状态服务，尽可能****让客户端总是向同一****提供者发起调用，
+	除非该提供者挂了，再连另一台。
+粘滞连接将自动开启延迟连接，以减少长连接数
+
+------------------------------------------------------
+令牌验证
+作用：防止消费者绕过注册中心访问提供者******
+	在注册中心控制权限*****，以决定是否下发令牌*****给消费者
+	注册中心可灵活改变授权方式*****，而不需修改或升级提供者
+
+配置：
+	<!--随机token令牌，使用UUID生成-->
+	<dubbo:provider interface="com.foo.BarService" token="true" />
