@@ -274,3 +274,42 @@ sent="false" 不等待消息发出，将消息放入IO队列，即刻返回。
 参数回调方式与调用本地callback或listener相同，只需要在Spring的配置文件中声明哪个参数是callback类型即可。
 Dubbo将基于长连接生成反向代理，这样就可以从服务器端调用客户端逻辑。
 
+配置：
+		<!-- 服务分组    id对应多种实现  -->
+		<dubbo:reference id="callbackService" interface="com.dubbo.CallbackService" />
+	
+			
+		<bean id="callbackService" class="com.callback.impl.CallbackServiceImpl" />
+		<dubbo:service interface="com.callback.CallbackService" ref="callbackService" connections="1" callbacks="1000">
+		    
+		    //配置方法 addListener
+		    <dubbo:method name="addListener">
+		    	
+		    	//配置 addListener对应的参数 CallbackListener类
+		        <dubbo:argument index="1" callback="true" />
+		        <!--也可以通过指定类型的方式-->
+		        <!--<dubbo:argument type="com.demo.CallbackListener" callback="true" />-->
+		    
+		    </dubbo:method>
+		    
+		</dubbo:service>
+
+
+自动回调：
+		provider.java
+ 		listener.changed(getChanged(key));
+ 		
+ 		consumer.java:
+ 		 callbackService.addListener("foo.bar", new CallbackListener() {
+            public void changed(String msg) {
+                System.out.println("callback1:" + msg);
+            }
+        });
+        
+        
+运行结果:
+		callback1:Changed: 2015-11-02 14:04:28
+		callback1:Changed: 2015-11-02 14:04:32
+		callback1:Changed: 2015-11-02 14:04:37
+		callback1:Changed: 2015-11-02 14:04:42
+		callback1:Changed: 2015-11-02 14:04:47
