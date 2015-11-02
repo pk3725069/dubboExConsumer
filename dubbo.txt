@@ -221,3 +221,56 @@ Please check if the providers have been started and registered.
 	   		String index = RpcContext.getContext().getAttachment("index"); // 获取客户端隐式传入的参数，用于框架集成，不建议常规业务使用
 	     }
 	}
+-----------------------------------------------------------------------------------	
+异步调用
+基于NIO的非阻塞实现并行调用，客户端不需要启动多线程即可完成并行调用多个远程服务，相对多线程开销较小。
+			   1.findXxx				2.request
+UserThread   ------------->  IOThread  ----------->  Server
+							      并行调用         <----------
+										6.response
+
+配置声明：
+
+		<dubbo:reference id="fooService" interface="com.alibaba.foo.FooService">
+		      <dubbo:method name="findFoo" async="true" />
+		</dubbo:reference>
+
+调用代码：			Foo？？？？？？？？？？？？？？？？	
+		fooService.findFoo(fooId); // 此调用会立即返回null
+		Future<Foo> fooFuture = RpcContext.getContext().getFuture(); // 拿到调用的Future引用，当结果返回后，会被通知和设置到此
+		
+		Foo foo = fooFuture.get(); // 如果foo已返回，直接拿到返回值，否则线程wait住****，等待foo返回后，线程会被notify唤醒
+
+设置是否等待消息发出
+sent="true" 等待消息发出，消息发送失败将抛出异常。	
+sent="false" 不等待消息发出，将消息放入IO队列，即刻返回。	
+配置
+		<dubbo:method name="findFoo" async="true" sent="true" />
+
+若你只是想异步，完全忽略返回值，以减少Future对象的创建和管理成本
+配置return="false"
+		<dubbo:method name="findFoo" async="true" return="false" />		
+
+-----------------------------------------------------------------------------------	
+本地调用
+本地调用，使用了Injvm协议，是一个伪协议，它不开启端口，不发起远程调用。
+ 只在JVM内直接关联，但执行Dubbo的Filter链
+
+	配置：
+		<dubbo:protocol name="injvm" /> //Define injvm protocol
+		
+		<dubbo:provider protocol="injvm" />  //Set default protocol:
+		
+		<dubbo:service protocol="injvm" />  //Set service protocol:
+		
+		<dubbo:reference injvm="true" .../>  //服务暴露与服务引用都需要声明injvm="true"
+		<dubbo:service injvm="true" .../>
+
+	调试问题
+		<dubbo:provider  injvm="true"/> 元素 'dubbo:provider' 中不允许出现属性 'injvm'
+
+-------------------------------------------------------------------------------------
+参数回调
+参数回调方式与调用本地callback或listener相同，只需要在Spring的配置文件中声明哪个参数是callback类型即可。
+Dubbo将基于长连接生成反向代理，这样就可以从服务器端调用客户端逻辑。
+
